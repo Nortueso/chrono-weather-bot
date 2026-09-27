@@ -79,7 +79,7 @@ chrono-weather-bot/
 ├── requirements.txt    # Project dependencies
 ├── README.md           # Documentation
 └── main.py             # Entrypoint
-
+```
 ---
 
 ## 📌 Usage Commands
