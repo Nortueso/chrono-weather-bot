@@ -58,9 +58,9 @@ BOT_TOKEN=your_telegram_bot_token
 WEATHER_API_KEY=your_openweathermap_api_key
 ```
 ### 5. Run the bot
-bash
-
+```bash
 python3 botmain01.py
+```
 ---
 
 ## 📂 Project Architecture
