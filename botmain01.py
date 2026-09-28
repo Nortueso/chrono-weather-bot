@@ -1,3 +1,15 @@
+#  |-----------------------------------------------------|
+#  | \                                                 / |
+#  |  \/-27|09|2026-------------------------------16-\/  |
+#  |   |                                             |   |
+#  |   |----->___(Chrono-Weather-Bot-0-3)___ <-------|   |
+#  |   |                                             |   |
+#  |  /\-11:05-----------------------------------182-/\  |
+#  | /                                                 \ |
+#  |-----------------------------------------------------|
+
+
+
 #1st----------> libs/modules 
 
 #---------- import
@@ -31,9 +43,9 @@ logging.basicConfig(level = logging.INFO)
 
 #3st----------> bot settings  
 
-TOKEN="8592926270:AAHwHWyVQfzCGWBihckLVA_FQk0yYrnzWxM"
+TOKEN=""
 
-WEATHER_API_KEY = "d74d6240e29fba0b7aa9165d90d31ed9"
+WEATHER_API_KEY = ""
 
 bot = Bot(token=TOKEN)
 
@@ -142,18 +154,18 @@ async def process_change_tz(callback: types.CallbackQuery):
         "Выберите ваш часовой пояс из списка ниже:",
         reply_markup=get_tz_keyboard()
     )
-    await callback.answer() # Закрывает анимацию загрузки на кнопке
+    await callback.answer() # Close animation downloading on button
 
 # Обработка выбора конкретного часового пояса
 @dp.callback_query(F.data.startswith("set_tz:"))
 async def process_set_tz(callback: types.CallbackQuery):
-    # Извлекаем название пояса из callback_data (например, "Europe/Moscow")
+    # finding name of tz from callback_data (example, "Europe/Moscow")
     chosen_tz = callback.data.split(":")[1]
     
-    # Сохраняем в базу данных навсегда
+    # Saving DB forever
     update_user_timezone(callback.from_user.id, chosen_tz)
     
-    # Обновляем сообщение для пользователя
+    # Updating messages for users
     await callback.message.edit_text(
         f"✅ Часовой пояс успешно изменен на: **{chosen_tz}**\n"
         f"Теперь команда /time будет показывать актуальное для вас время.",
