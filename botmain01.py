@@ -13,16 +13,18 @@
 #1st----------> libs/modules 
 
 #---------- import
-import aiogram
+
 import asyncio
 import sqlite3
 import logging
 import pytz
 import aiohttp
+import os
 
 #---------- from ... import ...
 
 from datetime import datetime
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -43,9 +45,11 @@ logging.basicConfig(level = logging.INFO)
 
 #3st----------> bot settings  
 
-TOKEN=""
+load_dotenv()
 
-WEATHER_API_KEY = ""
+TOKEN= os.getenv("")
+
+WEATHER_API_KEY = os.getenv("")
 
 bot = Bot(token=TOKEN)
 
@@ -226,5 +230,4 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 #fn----------> polling 
-
 
