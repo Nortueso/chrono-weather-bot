@@ -47,9 +47,9 @@ logging.basicConfig(level = logging.INFO)
 
 load_dotenv()
 
-TOKEN= os.getenv("")
+TOKEN= os.getenv("BOT_TOKEN")
 
-WEATHER_API_KEY = os.getenv("")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 bot = Bot(token=TOKEN)
 
@@ -108,7 +108,7 @@ def get_main_keyboard():
 def get_tz_keyboard():
     """Список доступных часовых поясов."""
     builder = InlineKeyboardBuilder()
-    # Кнопки: Текст на кнопке и callback_data (что отправится боту при нажатии)
+    
     builder.button(text="МСК (UTC+3)", callback_data="set_tz:Europe/Moscow")
     builder.button(text="Калининград (UTC+2)", callback_data="set_tz:Europe/Kaliningrad")
     builder.button(text="Самара (UTC+4)", callback_data="set_tz:Europe/Samara")
@@ -116,7 +116,7 @@ def get_tz_keyboard():
     builder.button(text="Ташкент (UTC+5)", callback_data="set_tz:Asia/Tashkent")
     builder.button(text="Алматы (UTC+6)", callback_data="set_tz:Asia/Almaty")
     
-    builder.adjust(2) # Располагаем по 2 кнопки в ряд
+    builder.adjust(2) 
     return builder.as_markup()
 
 #3.2fn--------> Keyboards / change tz
