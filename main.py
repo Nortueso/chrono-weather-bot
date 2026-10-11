@@ -15,6 +15,7 @@
 #---------- import
 
 import asyncio
+import html
 import sqlite3
 import logging
 import pytz
@@ -24,6 +25,7 @@ import os
 #---------- from ... import ...
 
 from datetime import datetime
+from aiogram.filters import Command, CommandObject
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -45,7 +47,7 @@ logging.basicConfig(level = logging.INFO)
 
 #3st----------> bot settings  
 
-load_dotenv()
+load_dotenv(override=True)
 
 TOKEN= os.getenv("BOT_TOKEN")
 
@@ -55,6 +57,8 @@ bot = Bot(token=TOKEN)
 
 
 dp = Dispatcher()
+
+
 #3fn----------> bot setting
 
 
@@ -92,6 +96,35 @@ def update_user_timezone(user_id: int, timezone: str):
             ON CONFLICT(user_id) DO UPDATE SET timezone = excluded.timezone
         ''', (user_id, timezone))
         conn.commit()
+        
+        
+def init_db():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                timezone TEXT DEFAULT 'Europe/Moscow',
+                city TEXT
+            )
+        ''')
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN city TEXT")
+        except sqlite3.OperationalError:
+            pass  # колонка уже есть
+        conn.commit()
+
+def get_user_city(user_id: int):
+    with sqlite3.connect(DB_NAME) as conn:
+        row = conn.execute("SELECT city FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return row[0] if row else None
+
+def update_user_city(user_id: int, city: str):
+    with sqlite3.connect(DB_NAME) as conn:
+        conn.execute('''
+            INSERT INTO users (user_id, city) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET city = excluded.city
+        ''', (user_id, city))
 
 #3.1fn--------> Data base work (SQLite)
 
@@ -114,7 +147,7 @@ def get_tz_keyboard():
     builder.button(text="Самара (UTC+4)", callback_data="set_tz:Europe/Samara")
     builder.button(text="Екатеринбург (UTC+5)", callback_data="set_tz:Europe/Yekaterinburg")
     builder.button(text="Ташкент (UTC+5)", callback_data="set_tz:Asia/Tashkent")
-    builder.button(text="Алматы (UTC+6)", callback_data="set_tz:Asia/Almaty")
+    builder.button(text="Алматы (UTC+5)", callback_data="set_tz:Asia/Almaty")
     
     builder.adjust(2) 
     return builder.as_markup()
@@ -176,36 +209,72 @@ async def process_set_tz(callback: types.CallbackQuery):
         parse_mode="Markdown"
     )
     await callback.answer(f"Сохранено: {chosen_tz}")
+    
+    
+class WeatherStates(StatesGroup):
+    waiting_for_city = State()
+
+async def send_weather(message: types.Message, city: str):
+    try:
+        text = await get_weather(city)
+    except WeatherError as e:
+        await message.answer(f"⚠️ {e}")
+        return
+    update_user_city(message.from_user.id, city)  # запоминаем только удачный город
+    await message.answer(text, parse_mode="HTML", reply_markup=get_main_keyboard())
+
+@dp.message(Command("weather"))
+async def cmd_weather(message: types.Message, command: CommandObject, state: FSMContext):
+    city = command.args or get_user_city(message.from_user.id)
+    if not city:
+        await state.set_state(WeatherStates.waiting_for_city)
+        await message.answer("Напиши название города.")
+        return
+    await send_weather(message, city)
+
+@dp.message(WeatherStates.waiting_for_city, F.text, ~F.text.startswith("/"))
+async def process_city(message: types.Message, state: FSMContext):
+    await state.clear()
+    await send_weather(message, message.text.strip())
 
 #3.3fn--------> handlers
 
 
 
-#4st----------> command /start 
-
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await message.answer(" WSP ")
-
-#4fn----------> command /start 
-
-
-
-#5st----------> command /time
-
-@dp.message(Command("time"))
-async def cmd_time(message: types.Message):
-    # Используем F-строку и вызываем datetime.now()
-    current_time = datetime.now().strftime("%H:%M:%S")
-    await message.answer(f"time: {current_time}")
-
-#5fn----------> command /time
-
-
-
 #6st----------> OpenWeatherAPI
 
+WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 
+class WeatherError(Exception):
+    """Ошибка с понятным пользователю текстом."""
+
+async def get_weather(city: str) -> str:
+    timeout = aiohttp.ClientTimeout(total=10)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            place = await geocode_city(session, city)
+
+            params = {
+                "lat": place["lat"], "lon": place["lon"],
+                "appid": WEATHER_API_KEY, "units": "metric", "lang": "ru",
+            }
+            async with session.get(WEATHER_URL, params=params) as resp:
+                if resp.status == 401:
+                    raise WeatherError("Ключ погоды не принят (возможно, ещё не активирован).")
+                if resp.status != 200:
+                    raise WeatherError(f"Сервис погоды ответил ошибкой {resp.status}.")
+                data = await resp.json()
+    except (aiohttp.ClientError, asyncio.TimeoutError):
+        raise WeatherError("Сервис погоды не отвечает, попробуй позже.")
+
+    name = place.get("local_names", {}).get("ru", place["name"])
+    return (
+        f"🌍 {html.escape(name)}, {place['country']}\n"
+        f"🌡 {data['main']['temp']:.0f}°C (ощущается {data['main']['feels_like']:.0f}°C)\n"
+        f"☁️ {data['weather'][0]['description'].capitalize()}\n"
+        f"💨 Ветер: {data['wind']['speed']} м/с\n"
+        f"💧 Влажность: {data['main']['humidity']}%"
+    )
 
 #6fn----------> OpenWeatherAPI
 
@@ -213,7 +282,19 @@ async def cmd_time(message: types.Message):
 
 #7st---------> Geo Error Fixing
 
+GEO_URL = "https://api.openweathermap.org/geo/1.0/direct"
 
+async def geocode_city(session: aiohttp.ClientSession, city: str) -> dict:
+    params = {"q": city, "limit": 1, "appid": WEATHER_API_KEY}
+    async with session.get(GEO_URL, params=params) as resp:
+        if resp.status == 401:
+            raise WeatherError("Ключ погоды не принят (возможно, ещё не активирован).")
+        if resp.status != 200:
+            raise WeatherError(f"Геосервис ответил ошибкой {resp.status}.")
+        data = await resp.json()
+    if not data:
+        raise WeatherError(f"Город «{html.escape(city)}» не найден. Проверь написание.")
+    return data[0]
 
 #7fn---------> Geo Error Fixing
 
@@ -222,12 +303,12 @@ async def cmd_time(message: types.Message):
 #st----------> polling 
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
     init_db() # Инициализируем базу данных перед запуском
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
 
 #fn----------> polling 
 
