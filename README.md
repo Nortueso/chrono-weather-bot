@@ -1,4 +1,4 @@
-# 🌦 Chrono Weather Bot
+# 🌦 Chrono Weather Bot 1.0
 
 A Telegram bot that shows **weather**, **local time** and sends **reminders** that survive restarts. Each user has their own saved city and time zone.
 
