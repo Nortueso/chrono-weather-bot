@@ -1,3 +1,18 @@
+# secrets
 .env
+
+# virtual environment
 .venv/
+venv/
+
+# local database
+*.db
+
+# python junk
 __pycache__/
+*.pyc
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
