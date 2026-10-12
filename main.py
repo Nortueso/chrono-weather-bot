@@ -18,10 +18,10 @@ import logging
 import os
 import re
 import sqlite3
-from datetime import datetime, timedelta
-
 import aiohttp
 import pytz
+
+from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters import Command, CommandObject
@@ -64,7 +64,7 @@ dp = Dispatcher()
 #4st----------> database (SQLite)
 
 DB_NAME = "users_settings.db"
-DB_TIME_FMT = "%Y-%m-%d %H:%M:%S"  # reminders are stored in UTC in this format
+DB_TIME_FMT = "%Y-%m-%d %H:%M:%S" 
 DEFAULT_TZ = "UTC"
 
 
@@ -78,8 +78,6 @@ def init_db():
                 city TEXT
             )
         ''')
-        # CREATE TABLE IF NOT EXISTS does not change an existing table,
-        # so for an old database we add the missing column ourselves.
         columns = [row[1] for row in conn.execute("PRAGMA table_info(users)")]
         if "city" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN city TEXT")
@@ -281,24 +279,21 @@ def parse_reminder(args: str, tz) -> tuple:
     args = args.strip()
     now = datetime.now(tz)
 
-    # Variant 1: in N minutes/hours/days  ->  30m, 2h, 1d
     m = re.match(r"^(\d+)([mhd])\s+(.+)$", args, re.S | re.I)
     if m:
         amount, unit, text = int(m[1]), UNITS[m[2].lower()], m[3]
-        target = now + timedelta(**{unit: amount})  # OverflowError if the number is absurd
+        target = now + timedelta(**{unit: amount})  
         return target.astimezone(pytz.utc), text
 
-    # Variant 2: today (or tomorrow if already passed) at HH:MM  ->  18:30
     m = re.match(r"^(\d{1,2}):(\d{2})\s+(.+)$", args, re.S)
     if m:
         hour, minute, text = int(m[1]), int(m[2]), m[3]
-        naive = datetime(now.year, now.month, now.day, hour, minute)  # ValueError for 25:99
+        naive = datetime(now.year, now.month, now.day, hour, minute)
         target = tz.localize(naive)
         if target <= now:
             target = tz.localize(naive + timedelta(days=1))
         return target.astimezone(pytz.utc), text
 
-    # Variant 3: exact date DD.MM HH:MM  ->  25.12 09:00
     m = re.match(r"^(\d{1,2})\.(\d{1,2})\s+(\d{1,2}):(\d{2})\s+(.+)$", args, re.S)
     if m:
         day, month, hour, minute, text = (int(m[1]), int(m[2]), int(m[3]), int(m[4]), m[5])
@@ -343,7 +338,7 @@ async def cmd_cancel(message: types.Message, state: FSMContext):
 @dp.message(Command("time"))
 async def cmd_time(message: types.Message):
     tz = pytz.timezone(get_user_timezone(message.from_user.id))
-    now = datetime.now(tz)  # one call, so date and time always match
+    now = datetime.now(tz)
     await message.answer(
         f"📍 Time zone: {tz.zone}\n"
         f"📅 Date: {now:%d.%m.%Y}\n"
@@ -385,9 +380,9 @@ async def send_weather(message: types.Message, city: str):
     try:
         text = await get_weather(city)
     except WeatherError as e:
-        await message.answer(f"⚠️ {e}", parse_mode="HTML")  # error text may contain escaped HTML
+        await message.answer(f"⚠️ {e}", parse_mode="HTML") 
         return
-    update_user_city(message.from_user.id, city)  # remember only a city that worked
+    update_user_city(message.from_user.id, city)  
     await message.answer(text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
 
